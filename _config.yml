@@ -1,0 +1,8 @@
+title: TypeScript
+description: TypeScript is a superset of JavaScript that compiles to clean JavaScript output.
+google_analytics: 
+show_downloads: true
+theme: jekyll-theme-architect
+
+gems:
+  - jekyll-mentions
