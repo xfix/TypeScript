@@ -818,7 +818,7 @@ namespace ts {
                 // At this point, node is either a qualified name or an identifier
                 Debug.assert(node.kind === SyntaxKind.Identifier || node.kind === SyntaxKind.QualifiedName || node.kind === SyntaxKind.PropertyAccessExpression,
                     "'node' was expected to be a qualified name, identifier or property access in 'isPartOfTypeNode'.");
-                // falls through
+            // falls through
             case SyntaxKind.QualifiedName:
             case SyntaxKind.PropertyAccessExpression:
             case SyntaxKind.ThisKeyword:
@@ -1015,7 +1015,7 @@ namespace ts {
     export function isValidESSymbolDeclaration(node: Node) {
         return isVariableDeclaration(node) ? isConst(node) && isIdentifier(node.name) && isVariableDeclarationInVariableStatement(node) :
             isPropertyDeclaration(node) ? hasReadonlyModifier(node) && hasStaticModifier(node) :
-            isPropertySignature(node) && hasReadonlyModifier(node);
+                isPropertySignature(node) && hasReadonlyModifier(node);
     }
 
     export function introducesArgumentsExoticObject(node: Node) {
@@ -1138,7 +1138,7 @@ namespace ts {
                     if (!includeArrowFunctions) {
                         continue;
                     }
-                    // falls through
+                // falls through
                 case SyntaxKind.FunctionDeclaration:
                 case SyntaxKind.FunctionExpression:
                 case SyntaxKind.ModuleDeclaration:
@@ -1197,7 +1197,7 @@ namespace ts {
                     if (!stopOnFunctions) {
                         continue;
                     }
-                    // falls through
+                // falls through
                 case SyntaxKind.PropertyDeclaration:
                 case SyntaxKind.PropertySignature:
                 case SyntaxKind.MethodDeclaration:
@@ -1402,7 +1402,7 @@ namespace ts {
                 if (node.parent.kind === SyntaxKind.TypeQuery || isJSXTagName(node)) {
                     return true;
                 }
-                // falls through
+            // falls through
             case SyntaxKind.NumericLiteral:
             case SyntaxKind.StringLiteral:
             case SyntaxKind.ThisKeyword:
@@ -1639,10 +1639,10 @@ namespace ts {
         }
         if (isIdentifier(name) && isPropertyAccessExpression(initializer)) {
             return (initializer.expression.kind as SyntaxKind.ThisKeyword === SyntaxKind.ThisKeyword ||
-                    isIdentifier(initializer.expression) &&
-                    (initializer.expression.escapedText === "window" as __String ||
-                     initializer.expression.escapedText === "self" as __String ||
-                     initializer.expression.escapedText === "global" as __String)) &&
+                isIdentifier(initializer.expression) &&
+                (initializer.expression.escapedText === "window" as __String ||
+                    initializer.expression.escapedText === "self" as __String ||
+                    initializer.expression.escapedText === "global" as __String)) &&
                 isSameEntityName(name, initializer.name);
         }
         if (isPropertyAccessExpression(name) && isPropertyAccessExpression(initializer)) {
@@ -2206,7 +2206,7 @@ namespace ts {
     export function getAllSuperTypeNodes(node: Node): ReadonlyArray<TypeNode> {
         return isInterfaceDeclaration(node) ? getInterfaceBaseTypeNodes(node) || emptyArray
             : isClassLike(node) ? concatenate(singleElementArray(getClassExtendsHeritageClauseElement(node)), getClassImplementsHeritageClauseElements(node)) || emptyArray
-            : emptyArray;
+                : emptyArray;
     }
 
     export function getInterfaceBaseTypeNodes(node: InterfaceDeclaration) {
@@ -2291,7 +2291,7 @@ namespace ts {
                 if (node.asteriskToken) {
                     flags |= FunctionFlags.Generator;
                 }
-                // falls through
+            // falls through
             case SyntaxKind.ArrowFunction:
                 if (hasModifier(node, ModifierFlags.Async)) {
                     flags |= FunctionFlags.Async;
@@ -2734,8 +2734,8 @@ namespace ts {
     export function escapeString(s: string, quoteChar?: CharacterCodes.doubleQuote | CharacterCodes.singleQuote | CharacterCodes.backtick): string {
         const escapedCharsRegExp =
             quoteChar === CharacterCodes.backtick ? backtickQuoteEscapedCharsRegExp :
-            quoteChar === CharacterCodes.singleQuote ? singleQuoteEscapedCharsRegExp :
-            doubleQuoteEscapedCharsRegExp;
+                quoteChar === CharacterCodes.singleQuote ? singleQuoteEscapedCharsRegExp :
+                    doubleQuoteEscapedCharsRegExp;
         return s.replace(escapedCharsRegExp, getReplacement);
     }
 
@@ -4075,6 +4075,119 @@ namespace ts {
 
     export function isObjectTypeDeclaration(node: Node): node is ObjectTypeDeclaration {
         return isClassLike(node) || isInterfaceDeclaration(node) || isTypeLiteralNode(node);
+    }
+
+    interface Statistic {
+        name: string;
+        value: string;
+    }
+
+    function countLines(program: Program): number {
+        let count = 0;
+        forEach(program.getSourceFiles(), file => {
+            count += getLineStarts(file).length;
+        });
+        return count;
+    }
+
+    function padLeft(s: string, length: number) {
+        while (s.length < length) {
+            s = " " + s;
+        }
+        return s;
+    }
+
+    function padRight(s: string, length: number) {
+        while (s.length < length) {
+            s = s + " ";
+        }
+
+        return s;
+    }
+
+    export interface StatisticsHost {
+        getMemoryUsage?(): number;
+        write(s: string): void;
+        newLine: string;
+    }
+
+    export function enableStatistics(compilerOptions: CompilerOptions) {
+        if (compilerOptions.diagnostics || compilerOptions.extendedDiagnostics) {
+            performance.enable();
+        }
+    }
+
+    export function reportStatistics(host: StatisticsHost, program: Program) {
+        let statistics: Statistic[];
+        const compilerOptions = program.getCompilerOptions();
+        if (compilerOptions.diagnostics || compilerOptions.extendedDiagnostics) {
+            statistics = [];
+            const memoryUsed = host.getMemoryUsage ? host.getMemoryUsage() : -1;
+            reportCountStatistic("Files", program.getSourceFiles().length);
+            reportCountStatistic("Lines", countLines(program));
+            reportCountStatistic("Nodes", program.getNodeCount());
+            reportCountStatistic("Identifiers", program.getIdentifierCount());
+            reportCountStatistic("Symbols", program.getSymbolCount());
+            reportCountStatistic("Types", program.getTypeCount());
+
+            if (memoryUsed >= 0) {
+                reportStatisticalValue("Memory used", Math.round(memoryUsed / 1000) + "K");
+            }
+
+            const programTime = performance.getDuration("Program");
+            const bindTime = performance.getDuration("Bind");
+            const checkTime = performance.getDuration("Check");
+            const emitTime = performance.getDuration("Emit");
+            if (compilerOptions.extendedDiagnostics) {
+                performance.forEachMeasure((name, duration) => reportTimeStatistic(`${name} time`, duration));
+            }
+            else {
+                // Individual component times.
+                // Note: To match the behavior of previous versions of the compiler, the reported parse time includes
+                // I/O read time and processing time for triple-slash references and module imports, and the reported
+                // emit time includes I/O write time. We preserve this behavior so we can accurately compare times.
+                reportTimeStatistic("I/O read", performance.getDuration("I/O Read"));
+                reportTimeStatistic("I/O write", performance.getDuration("I/O Write"));
+                reportTimeStatistic("Parse time", programTime);
+                reportTimeStatistic("Bind time", bindTime);
+                reportTimeStatistic("Check time", checkTime);
+                reportTimeStatistic("Emit time", emitTime);
+            }
+            reportTimeStatistic("Total time", programTime + bindTime + checkTime + emitTime);
+            reportStatistics();
+
+            performance.disable();
+        }
+
+        function reportStatistics() {
+            let nameSize = 0;
+            let valueSize = 0;
+            for (const { name, value } of statistics) {
+                if (name.length > nameSize) {
+                    nameSize = name.length;
+                }
+
+                if (value.length > valueSize) {
+                    valueSize = value.length;
+                }
+            }
+
+            for (const { name, value } of statistics) {
+                host.write(padRight(name + ":", nameSize + 2) + padLeft(value.toString(), valueSize) + host.newLine);
+            }
+        }
+
+        function reportStatisticalValue(name: string, value: string) {
+            statistics.push({ name, value });
+        }
+
+        function reportCountStatistic(name: string, count: number) {
+            reportStatisticalValue(name, "" + count);
+        }
+
+        function reportTimeStatistic(name: string, time: number) {
+            reportStatisticalValue(name, (time / 1000).toFixed(2) + "s");
+        }
     }
 }
 

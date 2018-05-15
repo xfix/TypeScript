@@ -2193,9 +2193,11 @@ namespace ts.server {
         public executeWithRequestId<T>(requestId: number, f: () => T) {
             try {
                 this.setCurrentRequest(requestId);
+                this.logger.info(`Starting request: ${requestId}`);
                 return f();
             }
             finally {
+                this.logger.info(`Finished request: ${requestId}`);
                 this.resetCurrentRequest(requestId);
             }
         }

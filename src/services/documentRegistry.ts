@@ -102,7 +102,7 @@ namespace ts {
         owners: string[];
     }
 
-    export function createDocumentRegistry(useCaseSensitiveFileNames?: boolean, currentDirectory = ""): DocumentRegistry {
+    export function createDocumentRegistry(useCaseSensitiveFileNames?: boolean, currentDirectory = "", log: (s: string) => void = noop): DocumentRegistry {
         // Maps from compiler setting target (ES3, ES5, etc.) to all the cached documents we have
         // for those settings.
         const buckets = createMap<Map<DocumentRegistryEntry>>();
@@ -169,14 +169,14 @@ namespace ts {
             version: string,
             acquiring: boolean,
             scriptKind?: ScriptKind): SourceFile {
-
+            const start = timestamp();
             const bucket = getBucketForCompilationSettings(key, /*createIfMissing*/ true);
             let entry = bucket.get(path);
             const scriptTarget = scriptKind === ScriptKind.JSON ? ScriptTarget.JSON : compilationSettings.target;
             if (!entry) {
                 // Have never seen this file with these settings.  Create a new source file for it.
                 const sourceFile = createLanguageServiceSourceFile(fileName, scriptSnapshot, scriptTarget, version, /*setNodeParents*/ false, scriptKind);
-
+                log(`Creating document ${path}`);
                 entry = {
                     sourceFile,
                     languageServiceRefCount: 1,
@@ -189,6 +189,7 @@ namespace ts {
                 // the script snapshot.  If so, update it appropriately.  Otherwise, we can just
                 // return it as is.
                 if (entry.sourceFile.version !== version) {
+                    log(`Creating new version of document ${path}`);
                     entry.sourceFile = updateLanguageServiceSourceFile(entry.sourceFile, scriptSnapshot, version,
                         scriptSnapshot.getChangeRange(entry.sourceFile.scriptSnapshot));
                 }
@@ -201,8 +202,10 @@ namespace ts {
                 if (acquiring) {
                     entry.languageServiceRefCount++;
                 }
+                log(`${acquiring ? "acquiring" : "updating"} document ${path}`);
             }
-
+            const elapsed = timestamp() - start;
+            log(`${acquiring ? "acquiring" : "updating"} document ${path} elapsed: ${elapsed}ms`);
             return entry.sourceFile;
         }
 
@@ -218,9 +221,11 @@ namespace ts {
 
             const entry = bucket.get(path);
             entry.languageServiceRefCount--;
+            log(`Releasing document: ${path}`);
 
             Debug.assert(entry.languageServiceRefCount >= 0);
             if (entry.languageServiceRefCount === 0) {
+                log(`Deleting document: ${path}`);
                 bucket.delete(path);
             }
         }
