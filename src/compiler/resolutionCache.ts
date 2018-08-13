@@ -210,6 +210,7 @@ namespace ts {
             filesWithInvalidatedNonRelativeUnresolvedImports = undefined;
             clearPerDirectoryResolutions();
             directoryWatchesOfFailedLookups.forEach((watcher, path) => {
+                resolutionHost.writeLog(`ResolutionCache:: finishCachingPerDirectoryResolution:: watchDir: ${path}, RefCount: ${watcher.refCount} Watcher:: ${watcher.watcher}`);
                 if (watcher.refCount === 0) {
                     directoryWatchesOfFailedLookups.delete(path);
                     watcher.watcher.close();
@@ -280,7 +281,7 @@ namespace ts {
                     resolutionsInFile.set(name, resolution);
                     watchFailedLookupLocationsOfExternalModuleResolutions(name, resolution);
                     if (existingResolution) {
-                        stopWatchFailedLookupLocationOfResolution(existingResolution);
+                        stopWatchFailedLookupLocationOfResolution(existingResolution, name);
                     }
 
                     if (logChanges && filesWithChangedSetOfUnresolvedImports && !resolutionIsEqualTo(existingResolution, resolution)) {
@@ -297,7 +298,7 @@ namespace ts {
             // Stop watching and remove the unused name
             resolutionsInFile.forEach((resolution, name) => {
                 if (!seenNamesInFile.has(name) && !contains(reusedNames, name)) {
-                    stopWatchFailedLookupLocationOfResolution(resolution);
+                    stopWatchFailedLookupLocationOfResolution(resolution, name);
                     resolutionsInFile.delete(name);
                 }
             });
@@ -445,31 +446,40 @@ namespace ts {
         }
 
         function watchFailedLookupLocationsOfExternalModuleResolutions(name: string, resolution: ResolutionWithFailedLookupLocations) {
+            resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions: ${name}:: CurrentRefCount: ${resolution.refCount} `);
             // No need to set the resolution refCount
             if (resolution.failedLookupLocations && resolution.failedLookupLocations.length) {
                 if (resolution.refCount) {
                     resolution.refCount++;
+                    resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions: Just added refcount ${name}:: CurrentRefCount: ${resolution.refCount} `);
                 }
                 else {
                     resolution.refCount = 1;
                     if (isExternalModuleNameRelative(name)) {
-                        watchFailedLookupLocationOfResolution(resolution);
+                        resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions:: Relative module reoslution:: Start watching failed lookup locaitons ${name}:: CurrentRefCount: ${resolution.refCount}`);
+                        resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions:: Relative module reoslution:: Failed lookups: ${JSON.stringify(resolution.failedLookupLocations, undefined, " ")}: Just added refcount ${name}:: CurrentRefCount: ${resolution.refCount}`);
+                        watchFailedLookupLocationOfResolution(resolution, name);
                     }
                     else {
+                        resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions:: non relative module reoslution:: Defer start watching failed lookup locaitons ${name}:: CurrentRefCount: ${resolution.refCount}`);
+                        resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationsOfExternalModuleResolutions:: non relative module reoslution:: Deferred Failed lookups: ${JSON.stringify(resolution.failedLookupLocations, undefined, " ")}: Just added refcount ${name}:: CurrentRefCount: ${resolution.refCount}`);
                         nonRelativeExternalModuleResolutions.add(name, resolution);
                     }
                 }
             }
         }
 
-        function watchFailedLookupLocationOfResolution(resolution: ResolutionWithFailedLookupLocations) {
+        function watchFailedLookupLocationOfResolution(resolution: ResolutionWithFailedLookupLocations, name: string) {
             Debug.assert(!!resolution.refCount);
+            resolutionHost.writeLog(`ResolutionCache:: ${name} watchFailedLookupLocationOfResolution:: Resolution.refCount:: ${resolution.refCount}:: Failed lookups: ${JSON.stringify(resolution.failedLookupLocations, undefined, " ")}`);
 
             const { failedLookupLocations } = resolution;
             let setAtRoot = false;
             for (const failedLookupLocation of failedLookupLocations) {
                 const failedLookupLocationPath = resolutionHost.toPath(failedLookupLocation);
                 const { dir, dirPath, nonRecursive, ignore } = getDirectoryToWatchFailedLookupLocation(failedLookupLocation, failedLookupLocationPath);
+                resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationOfResolution:: ${failedLookupLocation} watchDir: ${dir}, nonRecursive: ${nonRecursive} ignore: ${ignore} SetAtRoot: ${dirPath === rootPath}`);
+
                 if (!ignore) {
                     // If the failed lookup location path is not one of the supported extensions,
                     // store it in the custom path
@@ -500,7 +510,8 @@ namespace ts {
             const program = resolutionHost.getCurrentProgram();
             const updateResolution = program && program.getTypeChecker().tryFindAmbientModuleWithoutAugmentations(name) ?
                 setRefCountToUndefined : watchFailedLookupLocationOfResolution;
-            resolutions.forEach(updateResolution);
+            resolutionHost.writeLog(`ResolutionCache:: watchFailedLookupLocationOfNonRelativeModuleResolutions:: resolution: ${name}:: isAmbient:: ${updateResolution === setRefCountToUndefined}`);
+            resolutions.forEach(r => updateResolution(r, name));
         }
 
         function setDirectoryWatcher(dir: string, dirPath: Path, nonRecursive?: boolean) {
@@ -508,27 +519,35 @@ namespace ts {
             if (dirWatcher) {
                 Debug.assert(!!nonRecursive === !!dirWatcher.nonRecursive);
                 dirWatcher.refCount++;
+                resolutionHost.writeLog(`ResolutionCache:: setDirectoryWatcher:: watchDir: ${dir}, reusing refCount: ${dirWatcher.refCount}`);
             }
             else {
+                resolutionHost.writeLog(`ResolutionCache:: setDirectoryWatcher:: watchDir: ${dir}, Created new dirWatcher refCount: 1`);
                 directoryWatchesOfFailedLookups.set(dirPath, { watcher: createDirectoryWatcher(dir, dirPath, nonRecursive), refCount: 1, nonRecursive });
+                resolutionHost.writeLog(`ResolutionCache:: setDirectoryWatcher:: watchDir: ${dir}, status ${directoryWatchesOfFailedLookups.get(dirPath)!.watcher}`);
             }
         }
 
-        function stopWatchFailedLookupLocationOfResolution(resolution: ResolutionWithFailedLookupLocations) {
+        function stopWatchFailedLookupLocationOfResolution(resolution: ResolutionWithFailedLookupLocations, name: string) {
+            resolutionHost.writeLog(`ResolutionCache:: stopWatchFailedLookupLocationOfResolution:: ${name} Current refCount: ${resolution.refCount}`);
             if (!resolution.refCount) {
+                resolutionHost.writeLog(`ResolutionCache:: stopWatchFailedLookupLocationOfResolution:: ${name} refCount: ${resolution.refCount}`);
                 return;
             }
 
             resolution.refCount--;
             if (resolution.refCount) {
+                resolutionHost.writeLog(`ResolutionCache:: stopWatchFailedLookupLocationOfResolution:: ${name} no action needed. Current refCount: ${resolution.refCount}`);
                 return;
             }
 
+            resolutionHost.writeLog(`ResolutionCache:: ${name} stopWatchFailedLookupLocationOfResolution:: Resolution.refCount:: ${resolution.refCount}:: Failed lookups: ${JSON.stringify(resolution.failedLookupLocations, undefined, " ")}`);
             const { failedLookupLocations } = resolution;
             let removeAtRoot = false;
             for (const failedLookupLocation of failedLookupLocations) {
                 const failedLookupLocationPath = resolutionHost.toPath(failedLookupLocation);
-                const { dirPath, ignore } = getDirectoryToWatchFailedLookupLocation(failedLookupLocation, failedLookupLocationPath);
+                const { dirPath, ignore, dir, nonRecursive } = getDirectoryToWatchFailedLookupLocation(failedLookupLocation, failedLookupLocationPath);
+                resolutionHost.writeLog(`ResolutionCache:: stopWatchFailedLookupLocationOfResolution:: ${failedLookupLocation} watchDir: ${dir}, nonRecursive: ${nonRecursive} ignore: ${ignore} SetAtRoot: ${dirPath === rootPath}`);
                 if (!ignore) {
                     const refCount = customFailedLookupPaths.get(failedLookupLocationPath);
                     if (refCount) {
@@ -558,6 +577,7 @@ namespace ts {
             const dirWatcher = directoryWatchesOfFailedLookups.get(dirPath)!;
             // Do not close the watcher yet since it might be needed by other failed lookup locations.
             dirWatcher.refCount--;
+            resolutionHost.writeLog(`ResolutionCache:: removeDirectoryWatcher:: watchDir: ${dirPath}, new refCount: ${dirWatcher.refCount} watcher::${dirWatcher.watcher}`);
         }
 
         function createDirectoryWatcher(directory: string, dirPath: Path, nonRecursive: boolean | undefined) {
