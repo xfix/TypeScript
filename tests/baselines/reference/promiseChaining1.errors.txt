@@ -1,8 +1,10 @@
 tests/cases/compiler/promiseChaining1.ts(7,50): error TS2345: Argument of type '(x: S) => string' is not assignable to parameter of type '(x: S) => Function'.
   Type 'string' is not assignable to type 'Function'.
+tests/cases/compiler/promiseChaining1.ts(7,79): error TS2345: Argument of type '(x: Function) => number' is not assignable to parameter of type '(x: Function) => Function'.
+  Type 'number' is not assignable to type 'Function'.
 
 
-==== tests/cases/compiler/promiseChaining1.ts (1 errors) ====
+==== tests/cases/compiler/promiseChaining1.ts (2 errors) ====
     // same example but with constraints on each type parameter
     class Chain2<T extends { length: number }> {
         constructor(public value: T) { }
@@ -13,6 +15,9 @@ tests/cases/compiler/promiseChaining1.ts(7,50): error TS2345: Argument of type '
                                                      ~~~~~~~~~~
 !!! error TS2345: Argument of type '(x: S) => string' is not assignable to parameter of type '(x: S) => Function'.
 !!! error TS2345:   Type 'string' is not assignable to type 'Function'.
+                                                                                  ~~~~~~~~~~~~~
+!!! error TS2345: Argument of type '(x: Function) => number' is not assignable to parameter of type '(x: Function) => Function'.
+!!! error TS2345:   Type 'number' is not assignable to type 'Function'.
             return new Chain2(result);
         }
     }
