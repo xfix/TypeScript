@@ -108,11 +108,18 @@ namespace ts.server {
         writeSync(fd: number, data: any, position?: number, enconding?: string): number;
         statSync(path: string): Stats;
         stat(path: string, callback?: (err: NodeJS.ErrnoException, stats: Stats) => any): void;
+        createReadStream(path: string): NodeJS.ReadStream;
     } = require("fs");
 
-
+    let inputStream: NodeJS.ReadStream | undefined;
+    {
+        const inputFile = findArgument("--inputFile");
+        if (inputFile) {
+            inputStream = fs.createReadStream(stripQuotes(inputFile));
+        }
+    }
     const rl = readline.createInterface({
-        input: process.stdin,
+        input: inputStream || process.stdin,
         output: process.stdout,
         terminal: false,
     });
@@ -578,7 +585,9 @@ namespace ts.server {
             });
 
             rl.on("close", () => {
-                this.exit();
+                if (!inputStream) {
+                    this.exit();
+                }
             });
         }
     }
