@@ -1436,7 +1436,7 @@ namespace ts.server {
         }
 
         /*@internal*/
-        forEachResolvedProjectReference<T>(
+        forEachProjectReference<T>(
             cb: (resolvedProjectReference: ResolvedProjectReference | undefined, resolvedProjectReferencePath: Path) => T | undefined,
             cbProjectRef: (projectReference: ProjectReference) => T | undefined,
             cbPotentialProjectRef: (path: Path) => T | undefined
