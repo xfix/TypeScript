@@ -1041,7 +1041,8 @@ namespace ts.server {
         }
 
         private removeProject(project: Project) {
-            this.logger.info(`remove project: ${project.projectName}\nFiles::${project.getRootFiles().toString()}`);
+            this.logger.info("`remove Project::");
+            project.print();
 
             project.close();
             if (Debug.shouldAssert(AssertionLevel.Normal)) {
@@ -1487,19 +1488,9 @@ namespace ts.server {
 
             const writeProjectFileNames = this.logger.hasLevel(LogLevel.verbose);
             this.logger.startGroup();
-            let counter = 0;
-            const printProjects = (projects: Project[], counter: number): number => {
-                for (const project of projects) {
-                    this.logger.info(`Project '${project.getProjectName()}' (${ProjectKind[project.projectKind]}) ${counter}`);
-                    this.logger.info(project.filesToString(writeProjectFileNames));
-                    this.logger.info("-----------------------------------------------");
-                    counter++;
-                }
-                return counter;
-            };
-            counter = printProjects(this.externalProjects, counter);
-            counter = printProjects(arrayFrom(this.configuredProjects.values()), counter);
-            printProjects(this.inferredProjects, counter);
+            let counter = printProjectsWithCounter(this.externalProjects, 0);
+            counter = printProjectsWithCounter(arrayFrom(this.configuredProjects.values()), counter);
+            printProjectsWithCounter(this.inferredProjects, counter);
 
             this.logger.info("Open files: ");
             this.openFiles.forEach((projectRootPath, path) => {
@@ -2969,5 +2960,13 @@ namespace ts.server {
     /* @internal */
     export function isConfigFile(config: ScriptInfoOrConfig): config is TsConfigSourceFile {
         return (config as TsConfigSourceFile).kind !== undefined;
+    }
+
+    function printProjectsWithCounter(projects: Project[], counter: number) {
+        for (const project of projects) {
+            project.print(counter);
+            counter++;
+        }
+        return counter;
     }
 }
