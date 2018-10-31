@@ -1962,6 +1962,7 @@ namespace ts.server {
             const path = toNormalizedPath(uncheckedFileName);
             const info = this.getScriptInfoForNormalizedPath(path);
             if (info) return info;
+            //need to consider all configs?Or should never touch those??
             const configProject = this.configuredProjects.get(uncheckedFileName);
             return configProject && configProject.getCompilerOptions().configFile;
         }

@@ -9273,6 +9273,66 @@ export const x = 10;`
                 },
             ]);
         });
+
+        it("foooo", () => { //name
+            const aTs: File = { path: "/packages/a/src/a0.ts", content: "export const a0 = 0;" };
+            const aTsconfig: File = { path: "/packages/a/tsconfig.json", content: JSON.stringify({
+                "compilerOptions": {
+                    "target": "es2015",
+                    "module": "commonjs",
+                    "moduleResolution": "node",
+                    "composite": true,
+                    "declaration": true,
+                    "declarationMap": true,
+                    "rootDir": "./src",
+                    "outDir": "./build"
+                },
+                "include": [
+                    "./src"
+                ]
+            }) };
+            const bTs: File = { path: "/packages/b/src/btest.ts", content: 'import { a0 } from "@test/a"' };
+            const bTsconfig: File = { path: "/packages/b/tsconfig.json", content: JSON.stringify({
+                "compilerOptions": {
+                    "target": "es2015",
+                    "module": "commonjs",
+                    "moduleResolution": "node",
+                    "composite": true,
+                    "declaration": true,
+                    "declarationMap": true,
+                    "rootDir": "./src",
+                    "outDir": "./build",
+                    "baseUrl": "."
+                },
+                "include": [
+                    "./src",
+                ],
+                "references": [
+                    {
+                        "path": "../a"
+                    }
+                ]
+            }) };
+
+            const host = createServerHost([aTs, aTsconfig, bTs, bTsconfig]);
+            const session = createSession(host);
+            openFilesForSession([aTs, bTs], session);
+
+            const response = executeSessionRequest<protocol.GetEditsForFileRenameRequest, protocol.GetEditsForFileRenameResponse>(session, CommandNames.GetEditsForFileRename, {
+                oldFilePath: aTs.path,
+                newFilePath: "/packages/a/src/a1.ts",
+            });
+            assert.deepEqual<ReadonlyArray<protocol.FileCodeEdits>>(response, [
+                //{
+                //    fileName: "/tsconfig.json",
+                //    textChanges: [{ ...protocolTextSpanFromSubstring(tsconfig.content, "./b.ts"), newText: "c.ts" }],
+                //},
+                //{
+                //    fileName: "/a.ts",
+                //    textChanges: [{ ...protocolTextSpanFromSubstring(aTs.content, "./b"), newText: "./c" }],
+                //},
+            ]);
+        });
     });
 
     describe("tsserverProjectSystem document registry in project service", () => {
