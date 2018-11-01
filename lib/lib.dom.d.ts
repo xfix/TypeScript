@@ -4036,7 +4036,7 @@ interface Document extends Node, NonElementParentNode, DocumentOrShadowRoot, Par
     /**
      * Returns the head element.
      */
-    readonly head: HTMLHeadElement | null;
+    readonly head: HTMLHeadElement;
     readonly hidden: boolean;
     /**
      * Retrieves a collection, in source order, of img objects in the document.
